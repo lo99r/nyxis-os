@@ -1,4 +1,4 @@
-#include "outputs_base.h"
+#include "console/outputs/outputs_base.h"
 #include "memory.h"
 #include "types.h"
 
@@ -106,7 +106,7 @@ const u8 FONTS[FONT_CHAR_COUNT][FONT_BYTES_PER_CHAR] = {
 // =====================
 // Font Access Function
 // =====================
-const u8* GetFont(char c)
+const u8* get_font(char c)
 {
     if (c < FONT_FIRST_CHAR || c > FONT_LAST_CHAR)
         return FONTS[0]; // fallback: space
@@ -117,7 +117,7 @@ const u8* GetFont(char c)
 // =====================
 // Fast Char Drawing
 // =====================
-void DrawCharFast(
+void draw_char_fast(
     u32* fb,
     u32  pixels_per_scanline,
     u32  x,

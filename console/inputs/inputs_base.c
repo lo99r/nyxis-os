@@ -1,7 +1,7 @@
 #include "nyxis.h"
 #include "lowlevel.h"
 
-#include "console/inputs_base.h"
+#include "console/inputs/inputs_base.h"
 
 // ==========================
 // 키보드 상태

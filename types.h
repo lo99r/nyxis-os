@@ -1,8 +1,6 @@
 #ifndef NYXIS_TYPES_H
 #define NYXIS_TYPES_H
 
-#include <stdint.h>
-
 // fixed size
 typedef unsigned char      u8;
 typedef unsigned short     u16;
@@ -16,15 +14,14 @@ typedef long long i64;
 
 
 // pointer-sized
-#if UINTPTR_MAX == 0xFFFFFFFFFFFFFFFF
-    #define __nyxis_64bits
+#ifdef NYXIS_64BITS
     typedef u64 usize;
     typedef i64 isize;
 #else
-    #define __nyxis_32bits
     typedef u32 usize;
     typedef i32 isize;
 #endif
+
 
 // NULL
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L

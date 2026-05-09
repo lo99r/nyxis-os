@@ -1,5 +1,7 @@
 #include "nyxis.h"
-#include "outputs_base.h"
+#include "console/outputs/outputs_base.h"
+
+#include "console/outputs/printk.h"
 
 // 커서 상태 (전역)
 static u32 g_cursor_x = 0;
@@ -36,7 +38,7 @@ void printk(const char *string)
             g_cursor_y = 0; // 또는 scroll 구현 가능
         }
 
-        DrawCharFast(
+        draw_char_fast(
             fb,
             pixels_per_scanline,
             g_cursor_x,
