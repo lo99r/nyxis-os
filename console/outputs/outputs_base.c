@@ -106,7 +106,7 @@ const u8 FONTS[FONT_CHAR_COUNT][FONT_BYTES_PER_CHAR] = {
 // =====================
 // Font Access Function
 // =====================
-const u8* get_font(char c)
+const u8* GetFont(char c)
 {
     if (c < FONT_FIRST_CHAR || c > FONT_LAST_CHAR)
         return FONTS[0]; // fallback: space
@@ -117,7 +117,7 @@ const u8* get_font(char c)
 // =====================
 // Fast Char Drawing
 // =====================
-void draw_char_fast(
+Nstatus draw_char_fast(
     u32* fb,
     u32  pixels_per_scanline,
     u32  x,
@@ -126,6 +126,9 @@ void draw_char_fast(
     u32  fg,
     u32  bg
 ) {
+    if (!fb || !pixels_per_scanline)
+        return NinvalidArg;
+
     const u8* glyph = GetFont(c);
 
     u32 line_buffer[16]; // 16px width
@@ -150,4 +153,6 @@ void draw_char_fast(
             sizeof(line_buffer)
         );
     }
+
+    return NSTATUS_OK;
 }

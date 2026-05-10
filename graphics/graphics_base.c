@@ -2,8 +2,8 @@
 #include "library/memory.h"
 
 static inline void draw_pixel(NTBLI* info, i32 x, i32 y, u32 color) {
-    u32* fb = (u32*)info->Framebuffer_Base;
-    fb[y * info->PixelsPerScanLine + x] = color;
+    u32* fb = (u32*)info->framebuffer_base;
+    fb[y * info->pixels_per_scan_line + x] = color;
 }
 
 static inline void draw_line_plus(NTBLI* info,
@@ -45,8 +45,8 @@ static inline void draw_hline_fast(
     i32 length,
     u32 color)
 {
-    u32* fb = (u32*)info->Framebuffer_Base;
-    u32 pitch = info->PixelsPerScanLine;
+    u32* fb = (u32*)info->framebuffer_base;
+    u32 pitch = info->pixels_per_scan_line;
 
     if (length <= 0) return;
 

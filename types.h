@@ -53,6 +53,26 @@ typedef i32 Nstatus;
 #define NSTATUS_CODE(x) ((x) & 0x7FFFFFFF)
 
 
+typedef struct {
+    usize       version;
+    utf16*      id;
+
+    // Memory
+    usize       memory_size;
+
+    // Framebuffer
+    void*       framebuffer_base;
+    usize       framebuffer_size;
+    u32         width;
+    u32         height;
+    u32         pixels_per_scan_line;
+
+    // ACPI
+    void*       Rsdp;
+
+} NTBLI;
+
+
 // error codes (16개)
 typedef enum {
     NnotFound        = NSTATUS_MAKE_ERR(1),
@@ -71,6 +91,6 @@ typedef enum {
     Ninterrupted     = NSTATUS_MAKE_ERR(14),
     Nunknown         = NSTATUS_MAKE_ERR(15),
     Nfatal           = NSTATUS_MAKE_ERR(16)
-} Nerror;
+} Nerror;;
 
 #endif

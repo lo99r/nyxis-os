@@ -1,6 +1,8 @@
 #ifndef BASE_H
 #define BASE_H
 
+#include "nyxis.h"
+
 // =====================
 // Font Info
 // =====================
@@ -15,11 +17,21 @@
 // =====================
 // Font Data
 // =====================
-extern const UINT8 FONTS[FONT_CHAR_COUNT][FONT_BYTES_PER_CHAR];
+extern const u8 FONTS[FONT_CHAR_COUNT][FONT_BYTES_PER_CHAR];
 
 // =====================
 // API
 // =====================
-const UINT8* GetFont(char c);
+const u8* GetFont(char c);
+
+Nstatus draw_char_fast(
+    u32* fb,
+    u32  pixels_per_scanline,
+    u32  x,
+    u32  y,
+    utf8 c,
+    u32  fg,
+    u32  bg
+);
 
 #endif

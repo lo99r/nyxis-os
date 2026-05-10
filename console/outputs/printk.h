@@ -3,14 +3,10 @@
 
 #include "nyxis.h"
 
-static u32 g_cursor_x;
-static u32 g_cursor_y;
-static u32 g_screen_width;
-static u32 g_screen_height;
-
 #define FONT_W 16
 #define FONT_H 16
 
-void printk(const char *string);
+Nstatus printk(const char *format, ...);
+Nstatus printk_init(u32 *framebuffer, u32 pixels_per_scanline, u32 screen_width, u32 screen_height);
 
 #endif
