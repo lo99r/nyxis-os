@@ -1,7 +1,7 @@
 #ifndef NYX_MEMORY_H
 #define NYX_MEMORY_H
 
-#include "nyxis.h"
+#include "include/nyxis.h"
 
 /*
 ========================================

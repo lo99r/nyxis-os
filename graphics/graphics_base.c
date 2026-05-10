@@ -1,4 +1,4 @@
-#include "nyxis.h"
+#include "include/nyxis.h"
 #include "library/memory.h"
 
 static inline void draw_pixel(NTBLI* info, i32 x, i32 y, u32 color) {

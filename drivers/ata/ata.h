@@ -1,7 +1,7 @@
 #ifndef ATA_H
 #define ATA_H
 
-#include "nyxis.h"
+#include "include/nyxis.h"
 
 // ATA ports for primary channel
 #define ATA_DATA        0x1F0

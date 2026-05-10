@@ -1,6 +1,6 @@
 #include "console/outputs/outputs_base.h"
-#include "memory.h"
-#include "types.h"
+#include "library/memory.h"
+#include "include/types.h"
 
 // =====================
 // Font Data

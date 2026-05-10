@@ -6,7 +6,7 @@
 #ifndef TIMER_BASE_H
 #define TIMER_BASE_H
 
-#include "nyxis.h"
+#include "include/nyxis.h"
 
 // ============================
 // CORE API

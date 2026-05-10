@@ -7,8 +7,8 @@
     #define NYXIS_32BITS
 #endif
 
-#include "types.h"
-#include "lowlevel.h"
+#include "include/types.h"
+#include "include/lowlevel.h"
 
 // =====================
 // Error Checking Macro

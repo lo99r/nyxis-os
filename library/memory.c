@@ -1,5 +1,5 @@
-#include "nyxis.h"
-#include "memory.h"
+#include "include/nyxis.h"
+#include "library/memory.h"
 
 /*
 ========================================

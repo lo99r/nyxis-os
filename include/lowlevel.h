@@ -1,7 +1,7 @@
 #ifndef LOWLEVEL_H
 #define LOWLEVEL_H
 
-#include "nyxis.h"
+#include "include/nyxis.h"
 
 // ============================
 // MSR (Model Specific Register)
