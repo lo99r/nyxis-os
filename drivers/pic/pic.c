@@ -16,6 +16,8 @@
 #define ICW1_INIT   0x10
 #define ICW1_ICW4   0x01
 #define ICW4_8086   0x01
+#define PIC_READ_IRR 0x0a
+#define PIC_READ_ISR 0x0b
 
 static u8 g_pic_offset1 = 0x20;
 static u8 g_pic_offset2 = 0x28;
