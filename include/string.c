@@ -37,7 +37,7 @@ i32 strncmp(const utf8* a, const utf8* b, usize n) {
 }
 
 /* strncpy */
-utf8* strncpy(utf8* dest, const utf8* src, uzie n) {
+utf8* strncpy(utf8* dest, const utf8* src, usize n) {
     usize i;
 
     for (i = 0; i < n && src[i]; i++)

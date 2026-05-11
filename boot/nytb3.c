@@ -1,353 +1,258 @@
-#include <Uefi.h>
-#include <Library/UefiLib.h>
-#include <Library/UefiBootServicesTableLib.h>
-#include <Library/MemoryAllocationLib.h>
-#include <Library/DevicePathLib.h>
-#include <Protocol/GraphicsOutput.h>
-#include <Protocol/LoadedImage.h>
-#include <Protocol/DevicePath.h>
-#include <IndustryStandard/Acpi.h>
+#include <efi.h>
+#include <efilib.h>
+#include <efiprot.h>
+
+#include "include/boot_info.h"
+
+/* ELF32 Definitions */
+#define ELF_MAGIC       0x464C457F
+#define ET_EXEC         2
+#define EM_386          3
+#define PT_LOAD         1
 
 typedef struct {
-    UINTN       Version;
-    CHAR16*     ID;
+    UINT32 e_magic;
+    UINT8 e_class;
+    UINT8 e_data;
+    UINT8 e_version;
+    UINT8 e_osabi;
+    UINT8 e_abiversion;
+    UINT8 pad[7];
+    UINT16 e_type;
+    UINT16 e_machine;
+    UINT32 e_version2;
+    UINT32 e_entry;
+    UINT32 e_phoff;
+    UINT32 e_shoff;
+    UINT32 e_flags;
+    UINT16 e_ehsize;
+    UINT16 e_phentsize;
+    UINT16 e_phnum;
+    UINT16 e_shentsize;
+    UINT16 e_shnum;
+    UINT16 e_shstrndx;
+} ELF_HEADER;
 
-    // Memory
-    UINTN       Memory_Size;
+typedef struct {
+    UINT32 p_type;
+    UINT32 p_offset;
+    UINT32 p_vaddr;
+    UINT32 p_paddr;
+    UINT32 p_filesz;
+    UINT32 p_memsz;
+    UINT32 p_flags;
+    UINT32 p_align;
+} ELF_PROGRAM_HEADER;
 
-    // Framebuffer
-    void*       Framebuffer_Base;
-    UINTN       Framebuffer_Size;
-    UINT32      Width;
-    UINT32      Height;
-    UINT32      PixelsPerScanLine;
+typedef void (*kernel_entry_t)(NTBLI*);
 
-    // ACPI
-    void*       Rsdp;
+/* Read file into allocated buffer */
+EFI_STATUS read_file(EFI_FILE_HANDLE file, VOID** buffer, UINTN* size) {
+    EFI_STATUS Status;
+    EFI_FILE_INFO* FileInfo;
+    UINTN InfoSize = 0;
 
-} NTBLI;
-
-EFI_STATUS HandleReboot(void) {
-    Print(L"[ REBOOTING ] :: System will reboot in 3 seconds...\n");
-
-    gBS->Stall(3000000);
-
-    gRT->ResetSystem(
-        EfiResetCold,
-        EFI_SUCCESS,
-        0,
-        NULL
-    );
-
-    return EFI_SUCCESS;
-}
-
-EFI_STATUS HandleError(
-    EFI_STATUS Status,
-    CHAR16* Message
-) {
-    if (EFI_ERROR(Status)) {
-        Print(
-            L"[ BOOTFAIL ] :: %s (%r)\n",
-            Message,
-            Status
-        );
-
-        gBS->Stall(3000000);
-
-        HandleReboot();
-
+    /* Get file info */
+    Status = uefi_call_wrapper(file->GetInfo, 4, file, &GenericFileInfo, &InfoSize, NULL);
+    if (Status != EFI_BUFFER_TOO_SMALL) {
         return Status;
     }
 
-    return EFI_SUCCESS;
+    FileInfo = AllocatePool(InfoSize);
+    if (!FileInfo) {
+        return EFI_OUT_OF_RESOURCES;
+    }
+
+    Status = uefi_call_wrapper(file->GetInfo, 4, file, &GenericFileInfo, &InfoSize, FileInfo);
+    if (EFI_ERROR(Status)) {
+        FreePool(FileInfo);
+        return Status;
+    }
+
+    *size = FileInfo->FileSize;
+    *buffer = AllocatePool(*size);
+    if (!*buffer) {
+        FreePool(FileInfo);
+        return EFI_OUT_OF_RESOURCES;
+    }
+
+    Status = uefi_call_wrapper(file->Read, 3, file, size, *buffer);
+    FreePool(FileInfo);
+    return Status;
 }
 
-EFI_STATUS EFIAPI UefiMain(
-    EFI_HANDLE ImageHandle,
-    EFI_SYSTEM_TABLE *SystemTable
-) {
-    EFI_STATUS Status;
+/* Load ELF kernel and return entry point */
+EFI_STATUS load_elf_kernel(VOID* elf_buffer, UINTN elf_size, kernel_entry_t* entry_point) {
+    ELF_HEADER* hdr = (ELF_HEADER*)elf_buffer;
+    ELF_PROGRAM_HEADER* phdr;
+    UINTN i;
 
-    (void)SystemTable;
-
-    //
-    // GOP
-    //
-
-    EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop;
-
-    Status = gBS->LocateProtocol(
-        &gEfiGraphicsOutputProtocolGuid,
-        NULL,
-        (VOID**)&Gop
-    );
-
-    if (EFI_ERROR(Status)) {
-        return HandleError(
-            Status,
-            L"GOP Locate Failed"
-        );
+    /* Validate ELF header */
+    if (elf_size < sizeof(ELF_HEADER)) {
+        return EFI_INVALID_PARAMETER;
     }
 
-    //
-    // NTBLI Allocate
-    //
-
-    NTBLI *Info;
-
-    Status = gBS->AllocatePool(
-        EfiLoaderData,
-        sizeof(NTBLI),
-        (void**)&Info
-    );
-
-    if (EFI_ERROR(Status)) {
-        return HandleError(
-            Status,
-            L"NTBLI Allocation Failed"
-        );
+    if (hdr->e_magic != ELF_MAGIC) {
+        Print(L"Invalid ELF magic: 0x%x\n", hdr->e_magic);
+        return EFI_INVALID_PARAMETER;
     }
 
-    //
-    // Fill Boot Info
-    //
+    if (hdr->e_machine != EM_386) {
+        Print(L"Invalid architecture: 0x%x\n", hdr->e_machine);
+        return EFI_INVALID_PARAMETER;
+    }
 
-    Info->Version           = 4;
-    Info->ID                = L"Nyxis Bootloader Tamyo";
+    if (hdr->e_type != ET_EXEC) {
+        Print(L"Not executable: 0x%x\n", hdr->e_type);
+        return EFI_INVALID_PARAMETER;
+    }
 
-    Info->Framebuffer_Base  =
-        (void*)Gop->Mode->FrameBufferBase;
+    /* Load PT_LOAD segments */
+    for (i = 0; i < hdr->e_phnum; i++) {
+        phdr = (ELF_PROGRAM_HEADER*)((UINTN)elf_buffer + hdr->e_phoff + i * hdr->e_phentsize);
 
-    Info->Framebuffer_Size  =
-        Gop->Mode->FrameBufferSize;
+        if (phdr->p_type == PT_LOAD) {
+            VOID* segment_addr = (VOID*)(UINTN)phdr->p_paddr;
+            VOID* segment_data = (VOID*)((UINTN)elf_buffer + phdr->p_offset);
 
-    Info->Width             =
-        Gop->Mode->Info->HorizontalResolution;
+            Print(L"Loading segment %u: 0x%x (size: 0x%x)\n", 
+                  i, phdr->p_paddr, phdr->p_memsz);
 
-    Info->Height            =
-        Gop->Mode->Info->VerticalResolution;
-
-    Info->PixelsPerScanLine =
-        Gop->Mode->Info->PixelsPerScanLine;
-
-    //
-    // Find RSDP
-    //
-
-    Info->Rsdp = NULL;
-
-    for (
-        UINTN i = 0;
-        i < gST->NumberOfTableEntries;
-        i++
-    ) {
-        EFI_CONFIGURATION_TABLE *Table =
-            &gST->ConfigurationTable[i];
-
-        if (
-            CompareGuid(
-                &Table->VendorGuid,
-                &gEfiAcpi20TableGuid
-            ) ||
-
-            CompareGuid(
-                &Table->VendorGuid,
-                &gEfiAcpi10TableGuid
-            )
-        ) {
-            Info->Rsdp = Table->VendorTable;
-            break;
+            /* Zero and copy segment data */
+            SetMem(segment_addr, phdr->p_memsz, 0);
+            CopyMem(segment_addr, segment_data, phdr->p_filesz);
         }
     }
 
-    if (Info->Rsdp == NULL) {
-        return HandleError(
-            EFI_NOT_FOUND,
-            L"RSDP Not Found"
-        );
-    }
+    *entry_point = (kernel_entry_t)(UINTN)hdr->e_entry;
+    return EFI_SUCCESS;
+}
 
-    //
-    // Memory Map
-    //
+EFI_STATUS
+EFIAPI
+efi_main(
+    EFI_HANDLE ImageHandle,
+    EFI_SYSTEM_TABLE* SystemTable
+) {
+    EFI_STATUS Status;
+    EFI_LOADED_IMAGE* LoadedImage;
+    EFI_FILE_IO_INTERFACE* FileSystem;
+    EFI_FILE_HANDLE RootDir, KernelFile;
+    VOID* KernelBuffer = NULL;
+    UINTN KernelSize = 0;
+    kernel_entry_t KernelEntry = NULL;
 
-    EFI_MEMORY_DESCRIPTOR *MemMap = NULL;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL* Gop;
+    NTBLI* BootInfo;
 
-    UINTN MemMapSize = 0;
-    UINTN MapKey;
-    UINTN DescriptorSize;
+    InitializeLib(ImageHandle, SystemTable);
 
-    UINT32 DescriptorVersion;
+    Print(L"Nyxis Bootloader v1.0\n");
+    Print(L"=====================\n");
 
-    Status = gBS->GetMemoryMap(
-        &MemMapSize,
-        NULL,
-        &MapKey,
-        &DescriptorSize,
-        &DescriptorVersion
-    );
-
-    if (Status != EFI_BUFFER_TOO_SMALL) {
-        return HandleError(
-            Status,
-            L"GetMemoryMap Size Query Failed"
-        );
-    }
-
-    MemMapSize += DescriptorSize * 2;
-
-    Status = gBS->AllocatePool(
-        EfiLoaderData,
-        MemMapSize,
-        (void**)&MemMap
-    );
-
+    /* Get loaded image info */
+    Status = uefi_call_wrapper(BS->HandleProtocol, 3, 
+        ImageHandle, &LoadedImageProtocol, (VOID**)&LoadedImage);
     if (EFI_ERROR(Status)) {
-        return HandleError(
-            Status,
-            L"Memory Map Allocation Failed"
-        );
+        Print(L"Failed to get loaded image: %r\n", Status);
+        return Status;
     }
 
-    Status = gBS->GetMemoryMap(
-        &MemMapSize,
-        MemMap,
-        &MapKey,
-        &DescriptorSize,
-        &DescriptorVersion
-    );
-
+    /* Get file system protocol */
+    Status = uefi_call_wrapper(BS->HandleProtocol, 3,
+        LoadedImage->DeviceHandle, &FileSystemProtocol, (VOID**)&FileSystem);
     if (EFI_ERROR(Status)) {
-        gBS->FreePool(MemMap);
-
-        return HandleError(
-            Status,
-            L"GetMemoryMap Failed"
-        );
+        Print(L"Failed to get file system: %r\n", Status);
+        return Status;
     }
 
-    UINTN TotalMem = 0;
-
-    for (
-        UINTN i = 0;
-        i < (MemMapSize / DescriptorSize);
-        i++
-    ) {
-        EFI_MEMORY_DESCRIPTOR *Desc =
-            (EFI_MEMORY_DESCRIPTOR*)
-            ((UINT8*)MemMap + (i * DescriptorSize));
-
-        TotalMem +=
-            Desc->NumberOfPages *
-            EFI_PAGE_SIZE;
-    }
-
-    Info->Memory_Size = TotalMem;
-
-    gBS->FreePool(MemMap);
-
-    //
-    // Loaded Image
-    //
-
-    EFI_LOADED_IMAGE_PROTOCOL *LoadedImage;
-
-    Status = gBS->HandleProtocol(
-        ImageHandle,
-        &gEfiLoadedImageProtocolGuid,
-        (void**)&LoadedImage
-    );
-
+    /* Open root directory */
+    Status = uefi_call_wrapper(FileSystem->OpenVolume, 2, FileSystem, &RootDir);
     if (EFI_ERROR(Status)) {
-        return HandleError(
-            Status,
-            L"LIP Handle Failed"
-        );
+        Print(L"Failed to open volume: %r\n", Status);
+        return Status;
     }
 
-    //
-    // Kernel Path
-    //
-
-    EFI_DEVICE_PATH_PROTOCOL *KernelPath;
-
-    KernelPath = FileDevicePath(
-        LoadedImage->DeviceHandle,
-        L"\\nyxskrnl.efi"
-    );
-
-    if (KernelPath == NULL) {
-        return HandleError(
-            EFI_OUT_OF_RESOURCES,
-            L"Device Path Creation Failed"
-        );
-    }
-
-    //
-    // Load Kernel
-    //
-
-    EFI_HANDLE KernelImage;
-
-    Status = gBS->LoadImage(
-        FALSE,
-        ImageHandle,
-        KernelPath,
-        NULL,
-        0,
-        &KernelImage
-    );
-
+    /* Open kernel.elf */
+    Print(L"Loading kernel.elf...\n");
+    Status = uefi_call_wrapper(RootDir->Open, 5, RootDir, &KernelFile, 
+        L"kernel.elf", EFI_FILE_MODE_READ, 0);
     if (EFI_ERROR(Status)) {
-        gBS->FreePool(KernelPath);
-
-        return HandleError(
-            Status,
-            L"Kernel LoadImage Failed"
-        );
+        Print(L"Failed to open kernel.elf: %r\n", Status);
+        uefi_call_wrapper(RootDir->Close, 1, RootDir);
+        return Status;
     }
 
-    gBS->FreePool(KernelPath);
-
-    //
-    // Pass NTBLI
-    //
-
-    EFI_LOADED_IMAGE_PROTOCOL *KernelLoadedImage;
-
-    Status = gBS->HandleProtocol(
-        KernelImage,
-        &gEfiLoadedImageProtocolGuid,
-        (void**)&KernelLoadedImage
-    );
-
+    /* Read kernel file */
+    Status = read_file(KernelFile, &KernelBuffer, &KernelSize);
     if (EFI_ERROR(Status)) {
-        return HandleError(
-            Status,
-            L"Kernel LIP Handle Failed"
-        );
+        Print(L"Failed to read kernel.elf: %r\n", Status);
+        uefi_call_wrapper(KernelFile->Close, 1, KernelFile);
+        uefi_call_wrapper(RootDir->Close, 1, RootDir);
+        return Status;
     }
 
-    KernelLoadedImage->LoadOptions     = Info;
-    KernelLoadedImage->LoadOptionsSize = sizeof(NTBLI);
+    uefi_call_wrapper(KernelFile->Close, 1, KernelFile);
+    uefi_call_wrapper(RootDir->Close, 1, RootDir);
 
-    //
-    // Start Kernel
-    //
+    Print(L"Kernel loaded: 0x%x bytes\n", KernelSize);
 
-    Status = gBS->StartImage(
-        KernelImage,
-        NULL,
-        NULL
-    );
-
+    /* Parse and load ELF */
+    Status = load_elf_kernel(KernelBuffer, KernelSize, &KernelEntry);
     if (EFI_ERROR(Status)) {
-        return HandleError(
-            Status,
-            L"Kernel StartImage Failed"
-        );
+        Print(L"Failed to load kernel: %r\n", Status);
+        FreePool(KernelBuffer);
+        return Status;
     }
 
+    Print(L"Kernel entry: 0x%x\n", (UINTN)KernelEntry);
+
+    /* Initialize GOP */
+    Status = uefi_call_wrapper(BS->LocateProtocol, 3,
+        &GraphicsOutputProtocol, NULL, (VOID**)&Gop);
+    if (EFI_ERROR(Status)) {
+        Print(L"GOP not available: %r\n", Status);
+        FreePool(KernelBuffer);
+        return Status;
+    }
+
+    /* Prepare boot info */
+    BootInfo = AllocatePages(1);
+    if (!BootInfo) {
+        Print(L"Failed to allocate boot info\n");
+        FreePool(KernelBuffer);
+        return EFI_OUT_OF_RESOURCES;
+    }
+
+    BootInfo->version = 1;
+    BootInfo->framebuffer_base = (VOID*)(UINTN)Gop->Mode->FrameBufferBase;
+    BootInfo->framebuffer_size = Gop->Mode->FrameBufferSize;
+    BootInfo->width = Gop->Mode->Info->HorizontalResolution;
+    BootInfo->height = Gop->Mode->Info->VerticalResolution;
+    BootInfo->pixels_per_scan_line = Gop->Mode->Info->PixelsPerScanLine;
+
+    Print(L"Boot info prepared\n");
+    Print(L"Framebuffer: 0x%x (%u x %u)\n", 
+          (UINTN)BootInfo->framebuffer_base,
+          BootInfo->width,
+          BootInfo->height);
+
+    /* Exit boot services */
+    Print(L"Exiting UEFI boot services...\n");
+    
+    Status = uefi_call_wrapper(BS->ExitBootServices, 2, ImageHandle, 0);
+    if (EFI_ERROR(Status)) {
+        Print(L"Failed to exit boot services: %r\n", Status);
+        FreePool(KernelBuffer);
+        return Status;
+    }
+
+    /* Free kernel buffer since we've loaded it into memory */
+    FreePool(KernelBuffer);
+
+    /* Jump to kernel */
+    KernelEntry(BootInfo);
+
+    /* Should not return */
     return EFI_SUCCESS;
 }
