@@ -8,7 +8,6 @@
 #endif
 
 #include "include/types.h"
-#include "include/lowlevel.h"
 
 // =====================
 // Error Checking Macro

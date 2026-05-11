@@ -1,5 +1,5 @@
 #include "include/nyxis.h"
-#include "library/memory.h"
+#include "include/memory.h"
 
 /*
 ========================================
@@ -15,7 +15,7 @@
 /* =========================
  * memset (word optimized)
  * ========================= */
-void *memset(void *dst, i8 value, usize size)
+void *memset(void *dst, int value, usize size)
 {
     utf8 *d8 = (utf8 *)dst;
 
