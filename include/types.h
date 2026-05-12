@@ -1,6 +1,9 @@
 #ifndef NYXIS_TYPES_H
 #define NYXIS_TYPES_H
 
+#define pack __attribute__((packed));
+#define interrupt __attribute__((interrupt))
+
 // fixed size
 typedef unsigned char      u8;
 typedef unsigned short     u16;

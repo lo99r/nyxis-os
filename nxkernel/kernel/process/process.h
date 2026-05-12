@@ -26,7 +26,7 @@ typedef struct process {
 } process_t;
 
 // Functions
-Nstatus process_init();
+Nstatus process_init(void*);
 Nstatus process_create(void* entry_point, void* stack);
 Nstatus process_switch(process_t* proc);
 Nstatus process_terminate(u32 pid);
