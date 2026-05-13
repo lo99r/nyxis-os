@@ -2,16 +2,16 @@
 #include "kernel/paging/paging.h"
 
 // Process list
-static process_t* process_list = 0;
-static u32 next_pid = 1;
+process_t* process_list = 0;
+u32 next_pid = 1;
 
 // Current process
-static process_t* current_process = 0;
+process_t* current_process = 0;
 
 // Initialize process system
-Nstatus process_init() {
+Nstatus process_init(void* plus) {
     // Create idle process
-    process_t* idle = (process_t*)0x200000; // Example allocation
+    process_t* idle = (process_t*)plus; // Example allocation
     idle->pid = 0;
     idle->state = PROCESS_RUNNING;
     idle->stack = (void*)0x300000;
@@ -26,7 +26,7 @@ Nstatus process_init() {
 
 // Create a new process
 Nstatus process_create(void* entry_point, void* stack) {
-    process_t* proc = (process_t*)0x201000; // Example allocation
+    process_t* proc = (process_t*)process_list+(sizeof(process_t)*next_pid); // Example allocation
     proc->pid = next_pid++;
     proc->state = PROCESS_READY;
     proc->stack = stack;

@@ -1,9 +1,13 @@
 #include "kernel/kernel.h"
-// #include "kernel/process/process.h"
+#include "kernel/process/process.h"
 #include "types.h"
 #include "boot_info.h"
 #include "lowlevel.h"
 #include "console/outputs/printk.h"
+#include "include/inturrupt.h"
+
+// Interrupt
+struct idt_entry idt;
 
 // Kernel information (NTBLI) - stored in kernel space
 // Only accessible via get_kernel_info() function
@@ -15,6 +19,29 @@ NTBLI* get_kernel_info() {
     // In a full implementation, add privilege checks here
     // For now, return the kernel info
     return kernel_info;
+}
+
+// Process list
+extern process_t* process_list;
+extern u32 next_pid;
+
+// Current process
+extern process_t* current_process;
+
+interrupt void zero_div(){
+	__asm__ volatile ("push $0");
+	//hahaha
+	struct status* current_stack_status;
+	current_stack_p = find_current_status();
+	if(current_stack_p->type){
+		process_terminate(current_process->pid);
+	}
+	else{
+		// KERNEL PANIC
+		for(;;){
+			__asm__ volatile ("hlt");
+		}
+	}
 }
 
 // Kernel main function - called from assembly entry point
@@ -45,6 +72,10 @@ void kernel_main(NTBLI* boot_info) {
     // Print boot message
     printk("Nyxis OS Kernel Started\n");
     printk("Resolution: %ux%u\n", boot_info->width, boot_info->height);
+    
+    // Set up Interrupt Handers
+    idt_set_gate(0, zero_div, idt, 0x8E, 0x0);
+    
 
     // TODO: Create first user process
     // TODO: Set up interrupt handlers
