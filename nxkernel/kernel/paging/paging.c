@@ -1,6 +1,6 @@
 #include "kernel/paging/paging.h"
-#include "include/memory.h"
-#include "include/lowlevel.h"
+#include "memory.h"
+#include "lowlevel.h"
 
 #define PAGE_PRESENT 0x1
 #define PAGE_RW      0x2

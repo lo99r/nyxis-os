@@ -13,19 +13,19 @@
 
 _start:
     /* Set up stack */
-    mov $0x1000000, %esp        /* Stack pointer at high memory */
+    movq $0x1000000, %rsp        /* Stack pointer at high memory */
     sub $8, %esp                /* Align stack to 16 bytes for ABI compliance */
 
     /* Preserve boot info pointer */
-    mov %edi, %eax              /* Move boot_info pointer to eax (first argument) */
-    push %eax                   /* Push as argument to kernel_main */
+    movq %rdi, %rax              /* Move boot_info pointer to rax (first argument) */
+    pushq %rax                   /* Push as argument to kernel_main */
 
     /* Call kernel main */
     call kernel_main
 
     /* Halt if kernel returns (shouldn't happen) */
     cli
-_kernel_returned
+_kernel_returned:
     hlt
     jmp _kernel_returned
 

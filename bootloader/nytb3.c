@@ -2,7 +2,7 @@
 #include <efilib.h>
 #include <efiprot.h>
 
-#include "include/boot_info.h"
+#include "boot_info.h"
 
 /* =========================================================
  * ELF32 DEFINITIONS

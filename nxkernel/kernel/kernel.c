@@ -1,8 +1,8 @@
-#include "kernel/paging/paging.h"
 #include "kernel/kernel.h"
 // #include "kernel/process/process.h"
-#include "include/types.h"
-#include "include/boot_info.h"
+#include "types.h"
+#include "boot_info.h"
+#include "lowlevel.h"
 #include "console/outputs/printk.h"
 
 // Kernel information (NTBLI) - stored in kernel space
@@ -25,20 +25,9 @@ void kernel_main(NTBLI* boot_info) {
     // Initialize kernel subsystems
     Nstatus status;
 
-    // Initialize paging
-    status = paging_init();
-    if (NSTATUS_IS_ERR(status)) {
-        // Error handling - for now, just halt
-        hlt();
-    }
-
-    // Enable paging
-    paging_enable();
-
     // Initialize process management
     // status = process_init();
     // if (NSTATUS_IS_ERR(status)) {
-    //     paging_disable();
     //     hlt();
     // }
 
@@ -50,7 +39,6 @@ void kernel_main(NTBLI* boot_info) {
         boot_info->height
     );
     if (NSTATUS_IS_ERR(status)) {
-        paging_disable();
         hlt();
     }
 

@@ -1,8 +1,8 @@
 #ifndef KERNEL_H
 #define KERNEL_H
 
-#include "include/types.h"
-#include "include/boot_info.h"
+#include "types.h"
+#include "boot_info.h"
 
 // Kernel main function - called from assembly entry point (_start)
 void kernel_main(NTBLI* boot_info);
