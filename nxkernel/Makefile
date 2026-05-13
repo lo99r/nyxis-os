@@ -1,105 +1,152 @@
-CC = knc
+CC = x86_64-elf-gcc
 AS = as
 LD = ld
 
-BUILD = out
+ROOT = ..
+BUILD = $(ROOT)/out
 
-# EFI Configuration
+# =========================
+# EFI (64-bit UEFI)
+# =========================
 EFIINC = /usr/include/efi
-EFIARCH = /usr/include/efi/ia32
+EFIARCH = /usr/include/efi/x86_64
 
-EFILIB = /usr/lib32
-CRT0 = /usr/lib32/crt0-efi-ia32.o
+EFILIB = /usr/lib
+CRT0 =
 
-OVMF = /usr/share/qemu/OVMF.fd
+OVMF = /usr/share/OVMF/OVMF_CODE_4M.fd
+OVMF_VARS = /usr/share/OVMF/OVMF_VARS_4M.fd
 
-# Bootloader Compiler Flags
+# =========================
+# Bootloader Flags
+# =========================
 CFLAGS = \
-	-I. \
-	-Iinclude \
-	-I$(EFIINC) \
-	-I$(EFIARCH) \
-	-fshort-wchar \
-	-m32 \
-	-fpic
+-I$(EFIINC) \
+-I$(EFIARCH) \
+-I$(ROOT)/include \
+-fshort-wchar \
+-std=gnu11 \
+-ffreestanding \
+-nostdlib -nostartfiles -nodefaultlibs \
+-fno-stack-protector \
+-fPIC \
+-mno-red-zone \
+-fno-builtin \
+-fno-common \
+-fno-omit-frame-pointer \
+-fno-delete-null-pointer-checks \
+-fno-strict-aliasing \
+-mno-mmx -mno-sse -mno-sse2 \
+-g \
+-Wall -Wextra \
+-Wshadow \
+-Wundef \
+-Werror \
+-Wcast-align \
+-Wwrite-strings \
+-Wstrict-prototypes \
+-Wmissing-prototypes \
+-Wformat=2
 
-# Kernel-specific flags
+# =========================
+# Kernel (64-bit)
+# =========================
 KERNEL_CFLAGS = \
+	-nostdinc \
 	-I. \
-	-Iinclude \
+	-I$(ROOT)/include \
 	-Ikernel \
 	-Iconsole/outputs \
-	-m32
+	-m64
 
-ASFLAGS = -m32
+ASFLAGS = --64
 
+# =========================
 # EFI Linker Flags
+# =========================
 EFI_LDFLAGS = \
 	-nostdlib \
 	-znocombreloc \
-	-T $(EFILIB)/elf_ia32_efi.lds \
+	-T $(EFILIB)/elf_x86_64_efi.lds \
 	-shared \
 	-Bsymbolic \
 	-L $(EFILIB) \
 	-lgnuefi \
 	-lefi
 
+# =========================
 # Kernel Linker Flags
+# =========================
 KERNEL_LDFLAGS = \
+	-m elf_x86_64 \
 	-nostdlib \
-	-T kernel/linker32.lds \
-	-m elf_i386
+	-T kernel/linker64.lds
 
-# Source files
-BOOTLOADER_SRC = boot/nytb3.c
+# =========================
+# Sources
+# =========================
+BOOTLOADER_SRC = $(ROOT)/bootloader/nytb3.c
 BOOTLOADER_OBJ = $(BUILD)/nytb3.o
-BOOTLOADER = $(BUILD)/BOOTIA32.EFI
+BOOTLOADER = $(BUILD)/BOOTX64.EFI
 
-KERNEL_SRC = \
-	kernel/kernel.c \
-	kernel/paging/paging.c \
-	include/memory.c \
-	console/outputs/printk.c \
-	console/outputs/outputs_base.c
+KERNEL = $(BUILD)/kernel.elf
+KERNEL_OBJS = \
+	$(BUILD)/start.o \
+	$(BUILD)/kernel.o \
+	$(BUILD)/memory.o \
+	$(BUILD)/console/outputs/printk.o \
+	$(BUILD)/console/outputs/outputs_base.o
 
-KERNEL_ASRC = kernel/start.S
-
-KERNEL_OBJ = $(KERNEL_SRC:.c=.o) $(KERNEL_ASRC:.S=.o)
-
-KERNEL = kernel.elf
-
+# =========================
 # Targets
+# =========================
 all: $(BOOTLOADER) $(KERNEL)
+
+kernel: $(KERNEL)
 
 $(BUILD):
 	mkdir -p $(BUILD)
 
-# Bootloader build
+# Bootloader
 $(BOOTLOADER_OBJ): $(BOOTLOADER_SRC) | $(BUILD)
+	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BOOTLOADER): $(BOOTLOADER_OBJ)
-	$(LD) $(EFI_LDFLAGS) $(CRT0) $< -o $@
+	$(LD) $(EFI_LDFLAGS) $< -o $@
 
-# Kernel assembly
-kernel/start.o: kernel/start.S
+# Kernel
+$(BUILD)/kernel.o: kernel/kernel.c | $(BUILD)
+	mkdir -p $(dir $@)
+	$(CC) $(KERNEL_CFLAGS) -c $< -o $@
+
+$(BUILD)/paging/paging.o: kernel/paging/paging.c | $(BUILD)
+	mkdir -p $(dir $@)
+	$(CC) $(KERNEL_CFLAGS) -c $< -o $@
+
+$(BUILD)/memory.o: $(ROOT)/include/memory.c | $(BUILD)
+	mkdir -p $(dir $@)
+	$(CC) $(KERNEL_CFLAGS) -c $< -o $@
+
+$(BUILD)/console/outputs/printk.o: console/outputs/printk.c | $(BUILD)
+	mkdir -p $(dir $@)
+	$(CC) $(KERNEL_CFLAGS) -c $< -o $@
+
+$(BUILD)/console/outputs/outputs_base.o: console/outputs/outputs_base.c | $(BUILD)
+	mkdir -p $(dir $@)
+	$(CC) $(KERNEL_CFLAGS) -c $< -o $@
+
+$(BUILD)/start.o: kernel/start.s | $(BUILD)
+	mkdir -p $(dir $@)
 	$(AS) $(ASFLAGS) $< -o $@
 
-# Kernel C compilation
-kernel/%.o: kernel/%.c
-	$(CC) $(KERNEL_CFLAGS) -c $< -o $@
-
-console/%.o: console/%.c
-	$(CC) $(KERNEL_CFLAGS) -c $< -o $@
-
-include/%.o: include/%.c
-	$(CC) $(KERNEL_CFLAGS) -c $< -o $@
-
-# Kernel linking
-$(KERNEL): $(KERNEL_OBJ)
+# Kernel link
+$(KERNEL): $(KERNEL_OBJS)
 	$(LD) $(KERNEL_LDFLAGS) -o $@ $^
 
-# Run in QEMU
+# =========================
+# Run (UEFI x86_64)
+# =========================
 run: $(BOOTLOADER) $(KERNEL)
 	dd if=/dev/zero of=esp.img bs=1M count=64
 	mkfs.vfat esp.img
@@ -107,14 +154,20 @@ run: $(BOOTLOADER) $(KERNEL)
 	mmd -i esp.img EFI
 	mmd -i esp.img EFI/BOOT
 
-	mcopy -i esp.img $(BOOTLOADER) ::EFI/BOOT/BOOTIA32.EFI
+	mcopy -i esp.img $(BOOTLOADER) ::EFI/BOOT/BOOTX64.EFI
 	mcopy -i esp.img $(KERNEL) ::kernel.elf
 
-	qemu-system-i386 \
-	-bios $(OVMF) \
-	-drive file=esp.img,format=raw,if=none,id=esp \
-	-device virtio-blk-pci,drive=esp \
-	-nographic
+	mkdir -p $(BUILD)
+	cp $(OVMF) $(BUILD)/OVMF_CODE.fd
+	cp $(OVMF_VARS) $(BUILD)/OVMF_VARS.fd
+
+	qemu-system-x86_64 \
+		-drive if=pflash,format=raw,file=$(BUILD)/OVMF_CODE.fd \
+		-drive if=pflash,format=raw,file=$(BUILD)/OVMF_VARS.fd \
+		-device usb-ehci,id=usb \
+		-device usb-storage,drive=esp,bus=usb.0 \
+		-drive file=esp.img,format=raw,if=none,id=esp \
+		-nographic
 
 clean:
 	rm -f $(KERNEL_OBJ)

@@ -1,7 +1,7 @@
 #ifndef PRINTK_H
 #define PRINTK_H
 
-#include "include/nyxis.h"
+#include "nyxis.h"
 
 #define FONT_W 16
 #define FONT_H 16

@@ -1,4 +1,4 @@
-#include "include/nyxis.h"
+#include "nyxis.h"
 #include "console/outputs/outputs_base.h"
 #include <stdarg.h>
 

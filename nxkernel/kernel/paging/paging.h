@@ -1,7 +1,7 @@
 #ifndef KERNEL_PAGING_H
 #define KERNEL_PAGING_H
 
-#include "include/nyxis.h"
+#include "nyxis.h"
 
 // Page directory entry
 typedef struct {

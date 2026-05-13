@@ -1,7 +1,7 @@
 #ifndef BASE_H
 #define BASE_H
 
-#include "include/nyxis.h"
+#include "nyxis.h"
 
 // =====================
 // Font Info
