@@ -107,11 +107,15 @@ struct regs64 {
 	u64 rbx;
 	u64 rax;
 };
+struct status {u8 type; void* pointer;};
 
 void idt_set_gate(i32, void*, struct idt_entry*, u8, u8);
 void idt_init(u16, u64);
 void* idt_get_entry();
 
 interrupt void zero_div();
+static struct status find_current_status();
+
+//must writing out a functions about the GDT!!!
 
 #endif

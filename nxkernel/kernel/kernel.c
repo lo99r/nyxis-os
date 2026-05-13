@@ -29,8 +29,19 @@ extern u32 next_pid;
 extern process_t* current_process;
 
 interrupt void zero_div(){
+	__asm__ volatile ("push $0");
 	//hahaha
-	process_terminate(current_process->pid);
+	struct status* current_stack_status;
+	current_stack_p = find_current_status();
+	if(current_stack_p->type){
+		process_terminate(current_process->pid);
+	}
+	else{
+		// KERNEL PANIC
+		for(;;){
+			__asm__ volatile ("hlt");
+		}
+	}
 }
 
 // Kernel main function - called from assembly entry point
