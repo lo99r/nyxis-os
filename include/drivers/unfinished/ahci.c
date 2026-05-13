@@ -175,7 +175,7 @@ static HBA_PORT* AhciFindPort(void) {
         pi >>= 1;
     }
 
-    return NULL;
+    return nNULL;
 }
 
 // ======================================================
